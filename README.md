@@ -28,4 +28,4 @@ First priority @todo:
  - General refactoring/optimization;
  - Adding auth/orization/entication
 
-####Killer shop - to stability and beyond!
+### Killer shop - to stability and beyond!
