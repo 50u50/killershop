@@ -7,6 +7,7 @@ use App\Api\Entity\Sales\Order\Item;
 use App\Api\Exception\BadRequestException;
 use App\Api\Form\Sales\OrderType;
 use App\Api\Service\Catalog\ProductService;
+use App\Api\Service\DiscountService;
 use App\Api\Service\MoneyService;
 use App\Api\Service\Sales\OrderService;
 use Swagger\Annotations as SWG;
@@ -22,7 +23,6 @@ use Symfony\Component\Routing\Annotation\Route;
  */
 class OrderController extends AbstractController
 {
-
     /**
      * @var ProductService
      */
@@ -31,17 +31,31 @@ class OrderController extends AbstractController
      * @var OrderService
      */
     private $orderService;
+    /**
+     * @var DiscountService
+     */
+    private $discountService;
 
+    /**
+     * OrderController constructor.
+     * @param ProductService $productService
+     * @param OrderService $orderService
+     * @param DiscountService $discountService
+     */
     public function __construct(
         ProductService $productService,
-        OrderService $orderService
+        OrderService $orderService,
+        DiscountService $discountService
     )
     {
         $this->productService = $productService;
         $this->orderService = $orderService;
+        $this->discountService = $discountService;
     }
 
     /**
+     * @todo refactor it, use service
+     *
      * @Route("/new", name="sales_order_new", methods={"POST"})
      *
      * @SWG\Tag(name="order")
@@ -58,10 +72,10 @@ class OrderController extends AbstractController
     public function new(Request $request): Response
     {
         $requestData = $request->request->all();
-        if(empty($requestData['customer_email'])) {
+        if (empty($requestData['customer_email'])) {
             throw new BadRequestException('Customer email can not be empty.');
         }
-        if(empty($requestData['order_items'])) {
+        if (empty($requestData['order_items'])) {
             throw new BadRequestException('Array of "items" can not be empty.');
         }
         $products = $this->productService->findByCodes(array_keys($requestData['order_items']));
@@ -77,10 +91,8 @@ class OrderController extends AbstractController
 
         foreach ($products as $product) {
             $qty = $requestData['order_items'][$product->getCode()];
-            /**
-             * @todo Apply discounts!!!!!!!!!!!
-             */
-            $subtotal = $product->getBasePrice() * $qty;
+            $this->discountService->setDiscountPrice($product);
+            $subtotal = $product->getDiscountPrice() * $qty;
             $total += $subtotal;
             $item = new Item();
             $item
@@ -92,7 +104,6 @@ class OrderController extends AbstractController
                 ->setSalesOrder($order);
             $items[] = $item;
         }
-
 
         $form = $this->createForm(OrderType::class, $order);
 
@@ -119,7 +130,6 @@ class OrderController extends AbstractController
         ];
 
         return new RedirectResponse($this->generateUrl('sales_order_show', $routeOptions));
-
     }
 
     /**
